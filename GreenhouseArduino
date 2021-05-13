@@ -1,0 +1,62 @@
+#include "DHT.h" // Подключение библиотеки DHT - датчика температуры и влажности
+#include <iarduino_RTC.h> // Подключение библиотеки RTC - модуля часов реального времени
+
+#define DHT_PIN 2 // Датчик температуры и влажности
+#define FC28_PIN A7 // Модуль влажности почвы
+#define DS1307_SCL_PIN A6 // Модуль часов реального времени - пин scl
+#define DS1307_SDA_PIN A5 // Модуль часов реального времени - пин sda
+#define RELAY_PIN 3 // Реле со светодиодной лентой
+#define GREEN_FIRE_PIN 4 // Зеленый светодиод
+#define RED_FIRE_PIN 5 // Красный светодиод
+#define BLUE_FIRE_PIN 6 // Синий светодиод
+
+#define DHT_TYPE DHT11 // тип датчика DHT
+
+DHT dht(DHT_PIN, DHT_TYPE); // создание объекта DHT
+iarduino_RTC watch(RTC_DS1307); // создание объекта RTC
+const char* sysT=__TIME__; // Получаем время с компьютера
+const int i[3] {(sysT[6]-48)*10+(sysT[7]-48), (sysT[3]-48)*10+(sysT[4]-48), (sysT[0]-48)*10+(sysT[1]-48)}; // Получаем время в формате секунды - минуты - часы
+
+int light = 0;
+
+void setup() {
+
+  Serial.begin(9600); // подключение последовательного порта
+  dht.begin(); //  Инициируем датчик DHT
+  watch.begin(); // Инициируем RTC модуль
+  watch.settime(i[0],i[1],i[2]); // Устанавливаем секунды-минуты-часы на RTC-модуле
+  
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(GREEN_FIRE_PIN, OUTPUT);
+  pinMode(RED_FIRE_PIN, OUTPUT);
+  pinMode(BLUE_FIRE_PIN, OUTPUT);
+}
+
+void loop() {
+  int curTime = watch.gettime(H); //Текущий час
+  if((curTime < 9) || (curTime > 18)) //Выключаем светодиодную ленту, если рано или поздно. Иначе - включаем.
+    digitalWrite(RELAY_PIN, LOW);
+  else
+    digitalWrite(RELAY_PIN, HIGH);
+  
+  float curHumidity = dht.readHumidity(); //Получаем данные о влажности с датчика
+  if((curHumidity < 40)||(curHumidity > 60))
+    digitalWrite(GREEN_FIRE_PIN, HIGH); // Устанавливаем зеленый цвет, если влажность слишком большая или маленькая
+   else
+    digitalWrite(GREEN_FIRE_PIN, LOW);
+
+  float curTemperature = dht.readTemperature(); // Получаем данные о температуре с датчика
+  if((curTemperature < 5) || (curTemperature > 20))
+    digitalWrite(RED_FIRE_PIN, HIGH); // Устанавливаем красный цвет, если температура слишком большая или маленькая
+  else
+    digitalWrite(RED_FIRE_PIN, LOW);
+
+  float curEarthHumidity = analogRead(FC28_PIN); // Получаем аналоговые данные о влажности почвы с датчика
+  curEarthHumidity = map(curEarthHumidity,550,10,0,100); // Получаем данные о влажности почвы в процентах
+  if((curEarthHumidity < 10)||(curEarthHumidity > 80)) // Если влажность почвы слишком большая или маленькая - устанавливаем синий цвет
+    digitalWrite(BLUE_FIRE_PIN, HIGH);
+  else
+    digitalWrite(BLUE_FIRE_PIN, LOW);
+
+  delay(2000); // Ждем 2 секунды
+}
